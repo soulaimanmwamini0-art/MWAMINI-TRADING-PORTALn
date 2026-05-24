@@ -118,6 +118,12 @@
         window.productCacheMap = {};
         let debounceTimer;
 
+        // HELPER: Converts a number (1-5) into a visual star string
+        function renderStars(ratingNumber) {
+            const num = parseInt(ratingNumber, 10) || 0;
+            return '⭐'.repeat(num); 
+        }
+
         document.addEventListener("DOMContentLoaded", async () => {
             if(!window.supabase) { console.error("Supabase not found"); return; }
             
@@ -164,7 +170,7 @@
             
             reviews?.forEach(r => {
                 const row = document.createElement('tr');
-                row.innerHTML = `<td>Review</td><td>${escapeHTML(r.name)}</td><td>Rating: ${r.rating} - ${escapeHTML(r.message)}</td><td><button onclick="deleteEntry('reviews','${r.id}')">Delete</button></td>`;
+                row.innerHTML = `<td>Review</td><td>${escapeHTML(r.name)}</td><td><span style="font-size: 1.1rem;">${renderStars(r.rating)}</span> - ${escapeHTML(r.message)}</td><td><button onclick="deleteEntry('reviews','${r.id}')">Delete</button></td>`;
                 tbody.appendChild(row);
             });
             
