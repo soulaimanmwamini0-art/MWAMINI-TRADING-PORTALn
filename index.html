@@ -137,6 +137,17 @@
                 const convertedPrice = (item.price / exchangeRates[sourceCurrency]) * exchangeRates[targetCurrency];
                 const currencySymbol = targetCurrency === "USD" ? "$" : (targetCurrency === "RWF" ? "RWF " : "₽");
                 const cleanDesc = item.description ? item.description.replace(/\[CURRENCY:\w+\]/g, "").trim() : "";
+                const isLowStock = item.quantity <= 3;
+                const finalMediaUrl = item.image_url ? (item.image_url.startsWith('http') ? item.image_url : window.supabase.storage.from('product-assets').getPublicUrl(item.image_url).data.publicUrl) : "https://via.placeholder.com/400x300?text=No+Asset";
+
+                const cardNode = document.createElement("div");
+                cardNode.className = `product-card ${isLowStock ? 'low-stock-alert' : ''}`;
+                cardNode.innerHTML = `
+                    <div style="position: relative; height: 200px; background: #f1f5f9;">
+                        <img src="${finalMediaUrl}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/400x300?text=Asset+Link+Error'">
+                        <span style="position: absolute; top: 0.75rem; right: 0.75rem; background: ${isLowStock ? 'var(--danger)' : 'var(--accent)'}; color: white; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;">
+                            ${item.status} (${item.quantity} units)
+                        </span>
                     </div>
                     <div style="padding: 1.25rem; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between;">
                         <div>
@@ -147,18 +158,6 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
                             <span style="font-size: 20px; font-weight: 700; color: var(--success);">${currencySymbol}${Math.round(convertedPrice).toLocaleString()}</span>
                             <button class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 13px;" onclick="openOrderModal('${item.id}', '${item.title.replace(/'/g, "\\'")}')">Order</button>
-                            // ... inside initializeOrderFulfillmentEngine()
-const payload = {
-    product_id: productId,
-    product_title: document.getElementById("form-product-title-val").value,
-    customer_name: document.getElementById("cust-name").value.trim(),
-    customer_phone: document.getElementById("cust-phone").value.trim(),
-    quantity: requestedQty,
-    delivery_location: document.getElementById("cust-location").value.trim(), // Changed from 'location'
-    notes: document.getElementById("cust-notes").value.trim(),
-    status: 'Pending'
-};
-// ...
                         </div>
                     </div>`;
                 container.appendChild(cardNode);
