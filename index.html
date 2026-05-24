@@ -38,7 +38,57 @@
         </select>
     </div>
 
-    <main class="products-grid" id="products-container"></main>
+    <main class="products-grid" id="products-container" style="margin-bottom: 2rem;"></main>
+
+    <section class="feedback-section" style="padding: 4rem 5%; background: var(--bg-surface); border-top: 1px solid var(--border-color);">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 4rem; max-width: 1200px; margin: 0 auto;">
+            
+            <div class="feedback-col">
+                <h2 style="margin-bottom: 0.5rem;">Share Your Experience</h2>
+                <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem;">Your high fidelity operational feedback sharpens our global supply lines.</p>
+                
+                <form id="review-form">
+                    <label style="display:block; margin-bottom: 0.5rem; font-weight:600; font-size: 14px;">Your Name / Enterprise</label>
+                    <input type="text" id="review-name" class="search-input" style="width: 100%; margin-bottom: 1.5rem; border-radius: 8px;" placeholder="e.g. Acme Logistics Corp" required>
+
+                    <label style="display:block; margin-bottom: 0.5rem; font-weight:600; font-size: 14px;">Service Dispatch Rating</label>
+                    <select id="review-rating" class="filter-select" style="width: 100%; margin-bottom: 1.5rem; border-radius: 8px;" required>
+                        <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
+                        <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
+                        <option value="3">⭐⭐⭐ (3 Stars)</option>
+                        <option value="2">⭐⭐ (2 Stars)</option>
+                        <option value="1">⭐ (1 Star)</option>
+                    </select>
+
+                    <label style="display:block; margin-bottom: 0.5rem; font-weight:600; font-size: 14px;">Verbatim Review Payload</label>
+                    <textarea id="review-message" class="search-input" style="width: 100%; height: 120px; margin-bottom: 2rem; border-radius: 8px; resize: vertical;" placeholder="Detail your experience with our dispatch..." required></textarea>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Submit Platform Review</button>
+                </form>
+            </div>
+
+            <div class="feedback-col">
+                <h2 style="margin-bottom: 0.5rem;">Secure Support Routing</h2>
+                <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem;">Have questions on custom tariffs or cargo weights? Drop a digital ticket.</p>
+                
+                <form id="inquiry-form">
+                    <label style="display:block; margin-bottom: 0.5rem; font-weight:600; font-size: 14px;">Central Helpdesk Destination</label>
+                    <div style="width: 100%; padding: 0.85rem 1rem; background: rgba(100, 116, 139, 0.1); color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 8px; margin-bottom: 1.5rem; font-style: italic; font-size: 14px;">
+                        Loading admin parameters...
+                    </div>
+
+                    <label style="display:block; margin-bottom: 0.5rem; font-weight:600; font-size: 14px;">Inquiry Core Subject</label>
+                    <input type="text" id="inquiry-subject" class="search-input" style="width: 100%; margin-bottom: 1.5rem; border-radius: 8px;" placeholder="e.g. Bulk Rice Logistics" required>
+
+                    <label style="display:block; margin-bottom: 0.5rem; font-weight:600; font-size: 14px;">Detailed Request Message</label>
+                    <textarea id="inquiry-message" class="search-input" style="width: 100%; height: 120px; margin-bottom: 2rem; border-radius: 8px; resize: vertical;" placeholder="Outline container dimensions required..." required></textarea>
+
+                    <button type="submit" class="btn" style="width: 100%; background: var(--success); color: white;">Transmit Ticket to Helpdesk</button>
+                </form>
+            </div>
+
+        </div>
+    </section>
 
     <div class="modal" id="verification-modal">
         <div class="modal-content glass-panel" style="text-align: center; max-width: 400px;">
@@ -88,12 +138,67 @@
             initializePublicCatalog();
             setupSearchFilters();
             initializeOrderFulfillmentEngine();
+            initializeFeedbackEngine(); // NEW INITIALIZATION
             
             const root = document.documentElement;
             document.getElementById('theme-toggle').addEventListener('click', () => {
                 root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
             });
         });
+
+        // --- NEW SUPPORT ENGINE LOGIC ---
+        function initializeFeedbackEngine() {
+            // Handle Review Submissions
+            document.getElementById("review-form").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const btn = e.target.querySelector('button[type="submit"]');
+                btn.disabled = true; btn.innerText = "Transmitting...";
+                
+                try {
+                    const payload = {
+                        name: document.getElementById("review-name").value.trim(),
+                        rating: parseInt(document.getElementById("review-rating").value, 10),
+                        message: document.getElementById("review-message").value.trim()
+                    };
+                    const { error } = await window.supabase.from('reviews').insert([payload]);
+                    if (error) throw error;
+                    
+                    alert("Review transmitted successfully. Your insights are valued.");
+                    e.target.reset();
+                } catch (err) {
+                    alert(`Routing failed: ${err.message}`);
+                } finally {
+                    btn.disabled = false; btn.innerText = "Submit Platform Review";
+                }
+            });
+
+            // Handle Inquiry Submissions
+            document.getElementById("inquiry-form").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const btn = e.target.querySelector('button[type="submit"]');
+                btn.disabled = true; btn.innerText = "Transmitting...";
+                
+                try {
+                    const payload = {
+                        name: "Platform Guest User", // Auto-assigned for anonymous tickets
+                        category: "Support Ticket",
+                        subject: document.getElementById("inquiry-subject").value.trim(),
+                        message: document.getElementById("inquiry-message").value.trim(),
+                        status: 'Pending'
+                    };
+                    const { error } = await window.supabase.from('inquiries').insert([payload]);
+                    if (error) throw error;
+                    
+                    alert("Ticket securely routed to the helpdesk. We will contact you shortly.");
+                    e.target.reset();
+                } catch (err) {
+                    alert(`Routing failed: ${err.message}`);
+                } finally {
+                    btn.disabled = false; btn.innerText = "Transmit Ticket to Helpdesk";
+                }
+            });
+        }
+        // ---------------------------------
 
         function openVerificationModal() { document.getElementById('verification-modal').classList.add('active'); }
         function closeVerificationModal() { 
