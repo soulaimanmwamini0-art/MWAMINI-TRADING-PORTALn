@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Mainframe - Mwamini</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header style="background: var(--bg-surface);">
+        <div class="brand-title">MWAMINI MAIN CONTROL</div>
+        <div style="display: flex; gap: 1rem;">
+            <button id="theme-toggle" class="btn" style="background: var(--border-color); color: var(--text-main);">Theme</button>
+            <button id="logout-btn" class="btn" style="background: var(--danger); color: white;">Terminate Session</button>
+        </div>
+    </header>
+
+    <div class="admin-layout">
+        <aside class="sidebar">
+            <button class="btn active-tab">Dashboard Analytics</button>
+            <button class="btn">Inventory Matrix</button>
+            <button class="btn">Customer Orders Log</button>
+            <button class="btn">Customer Comments</button>
+        </aside>
+
+        <main class="admin-content-area">
+            <section id="analytics-view" class="tab-content active-panel">
+                <h2 style="margin-bottom: 1.5rem;">System Analytics</h2>
+                <div style="display: flex; gap: 2rem; margin-bottom: 2rem;">
+                    <div style="flex: 1; background: var(--bg-surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                        <h4 style="color: var(--text-muted); margin-bottom: 0.5rem;">Global Asset Valuation</h4>
+                        <div id="metric-stock">Loading...</div>
+                    </div>
+                    <div style="flex: 1; background: var(--bg-surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                        <h4 style="color: var(--text-muted); margin-bottom: 0.5rem;">Total Orders Processed</h4>
+                        <div id="metric-orders" style="font-size:24px; font-weight:700;">Loading...</div>
+                    </div>
+                </div>
+                <div style="background: var(--bg-surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                    <canvas id="salesChart" height="80"></canvas>
+                </div>
+            </section>
+
+            <section id="inventory-view" class="tab-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h2>Inventory Command Center</h2>
+                    <button class="btn btn-primary" onclick="openNewProductForm()">+ Add New Commodity</button>
+                </div>
+                
+                <div id="product-form-container" style="display:none; background: var(--bg-surface); padding: 2rem; border-radius: 12px; border: 1px dashed var(--accent); margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">Commodity Registration Form</h3>
+                    <form id="sku-management-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <input type="hidden" id="sku-id">
+                        <div><label>Title</label><input type="text" id="sku-title" class="search-input" style="width:100%" required></div>
+                        <div><label>Category</label><select id="sku-category" class="filter-select" style="width:100%"><option value="Grains">Grains</option><option value="Agriculture">Agriculture</option><option value="Construction">Construction</option><option value="Electronics">Electronics</option></select></div>
+                        <div><label>Price Value</label><input type="number" id="sku-price" step="0.01" class="search-input" style="width:100%" required></div>
+                        <div><label>Currency Binding</label><select id="sku-currency-type" class="filter-select" style="width:100%"><option value="USD">USD</option><option value="RWF">RWF</option></select></div>
+                        <div><label>Stock Quantity</label><input type="number" id="sku-qty" class="search-input" style="width:100%" required></div>
+                        <div><label>Public Status</label><select id="sku-status" class="filter-select" style="width:100%"><option value="Available">Available</option><option value="Limited stock">Limited stock</option><option value="Out of stock">Out of stock</option></select></div>
+                        <div style="grid-column: 1/-1;"><label>Description</label><textarea id="sku-desc" class="search-input" style="width:100%; height:80px;"></textarea></div>
+                        <div style="grid-column: 1/-1;"><label>Asset Image</label><input type="file" id="sku-file" class="search-input" style="width:100%" accept="image/*"></div>
+                        <div style="grid-column: 1/-1; display:flex; gap:1rem;"><button type="submit" class="btn btn-primary" style="flex:1;">Save to Database</button><button type="button" class="btn" style="flex:1; border: 1px solid var(--border-color);" onclick="openNewProductForm()">Cancel</button></div>
+                    </form>
+                </div>
+
+                <div id="inventory-filter-container"></div>
+                <table class="dashboard-table">
+                    <thead><tr><th>Media</th><th>Title</th><th>Category</th><th>Valuation</th><th>Status / Qty</th><th>Actions</th></tr></thead>
+                    <tbody id="sku-table-body"></tbody>
+                </table>
+            </section>
+
+            <section id="orders-view" class="tab-content">
+                <h2 style="margin-bottom: 1.5rem;">Customer Orders Dashboard</h2>
+                <div style="display:flex; gap:1rem; margin-bottom:1.5rem; background:var(--bg-surface); padding:1rem; border-radius:8px; border:1px solid var(--border-color);">
+                    <input type="text" id="order-search" class="search-input" placeholder="Search customer name, ID, or product..." style="flex:2;">
+                    <select id="order-status-filter" class="filter-select" style="flex:1;">
+                        <option value="All">All Statuses</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Shipped">Shipped</option>
+                        <option value="Delivered">Delivered</option>
+                    </select>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="dashboard-table">
+                        <thead><tr><th>Order Ref</th><th>Date</th><th>Customer Details</th><th>Item & Qty</th><th>Delivery Location</th><th>Fulfillment State</th><th>Action</th></tr></thead>
+                        <tbody id="admin-orders-list"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="comments-view" class="tab-content">
+                <h2 style="margin-bottom: 1.5rem;">Customer Comments & Support</h2>
+                <div id="comments-dashboard">
+                    <div class="stats-grid" style="display:flex; gap:1rem; margin-bottom:2rem;">
+                        <div class="stat-card" style="padding:1rem; background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px;">Total Reviews: <span id="stat-reviews">0</span></div>
+                        <div class="stat-card" style="padding:1rem; background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px;">Pending Tickets: <span id="stat-tickets">0</span></div>
+                    </div>
+                    <table class="dashboard-table">
+                        <thead><tr><th>Type</th><th>From</th><th>Detail</th><th>Status/Action</th></tr></thead>
+                        <tbody id="comments-table-body"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="toast" class="toast-notification"></div>
+
+    <script src="supabase-config.js"></script>
+    <script>
+        let localAdminInventoryCache = [];
+        let rawOrdersCache = [];
+        const conversionAnchorRates = { USD: 1, RWF: 1290 };
+        window.productCacheMap = {};
+        let debounceTimer;
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            if(!window.supabase) { console.error("Supabase not found"); return; }
+            
+            const { data: { session } } = await window.supabase.auth.getSession();
+            if(!session) window.location.replace("login.html");
+            else initAdminApp();
+
+            document.getElementById('theme-toggle').addEventListener('click', () => {
+                const root = document.documentElement;
+                root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+            });
+            document.getElementById('logout-btn').addEventListener('click', async () => {
+                await window.supabase.auth.signOut();
+                window.location.replace("login.html");
+            });
+        });
+
+        function initAdminApp() {
+            setupNavigationListeners();
+            setupAdminSearchFilters();
+            loadAnalyticsDashboard();
+            loadInventoryControlMatrix();
+            loadOrdersQueue();
+            loadCustomerComments();
+            
+            document.getElementById('order-search').addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(renderOrdersTable, 300);
+            });
+            document.getElementById('order-status-filter').addEventListener('change', renderOrdersTable);
+        }
+
+        async function loadCustomerComments() {
+            const [{ data: reviews }, { data: inquiries }] = await Promise.all([
+                window.supabase.from('reviews').select('*'),
+                window.supabase.from('inquiries').select('*')
+            ]);
+            
+            document.getElementById('stat-reviews').innerText = reviews?.length || 0;
+            document.getElementById('stat-tickets').innerText = inquiries?.filter(i => i.status !== 'Resolved').length || 0;
+            
+            const tbody = document.getElementById('comments-table-body');
+            tbody.innerHTML = '';
+            
+            reviews?.forEach(r => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>Review</td><td>${escapeHTML(r.name)}</td><td>Rating: ${r.rating} - ${escapeHTML(r.message)}</td><td><button onclick="deleteEntry('reviews','${r.id}')">Delete</button></td>`;
+                tbody.appendChild(row);
+            });
+            
+            inquiries?.forEach(i => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>Support</td><td>${escapeHTML(i.name)}</td><td>[${i.category}] ${escapeHTML(i.subject)}: ${escapeHTML(i.message)}</td><td><select onchange="updateTicketStatus('${i.id}', this.value)"><option ${i.status==='Pending'?'selected':''}>Pending</option><option ${i.status==='Processing'?'selected':''}>Processing</option><option ${i.status==='Resolved'?'selected':''}>Resolved</option></select></td>`;
+                tbody.appendChild(row);
+            });
+        }
+
+        function escapeHTML(str) {
+            const p = document.createElement('p');
+            p.textContent = str || "";
+            return p.innerHTML;
+        }
+
+        window.updateTicketStatus = async (id, status) => {
+            await window.supabase.from('inquiries').update({ status }).eq('id', id);
+            showToast("Ticket status updated");
+        };
+
+        window.deleteEntry = async (table, id) => {
+            if(!confirm("Are you sure?")) return;
+            await window.supabase.from(table).delete().eq('id', id);
+            loadCustomerComments();
+        };
+
+        function showToast(msg) {
+            const toast = document.getElementById("toast");
+            toast.innerText = msg; toast.classList.add("show");
+            setTimeout(() => toast.classList.remove("show"), 3000);
+        }
+
+        function setupNavigationListeners() {
+            const navButtons = document.querySelectorAll('.sidebar .btn:not(#logout-btn)');
+            navButtons.forEach((btn, index) => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active-panel'));
+                    document.querySelectorAll('.sidebar .btn').forEach(b => b.classList.remove('active-tab'));
+                    e.target.classList.add('active-tab');
+                    
+                    const views = ['analytics-view', 'inventory-view', 'orders-view', 'comments-view'];
+                    document.getElementById(views[index]).classList.add('active-panel');
+                });
+            });
+        }
+
+        async function loadAnalyticsDashboard() {
+            const { data: prods } = await window.supabase.from('products').select('*');
+            const { data: ords } = await window.supabase.from('orders').select('*');
+            let totalValUSD = 0;
+            if(prods) {
+                prods.forEach(item => {
+                    const priceUSD = item.description?.includes("[CURRENCY:RWF]") ? item.price / conversionAnchorRates.RWF : item.price;
+                    totalValUSD += (priceUSD * (item.quantity || 0));
+                });
+            }
+            document.getElementById("metric-stock").innerHTML = `<div style="font-size:24px; font-weight:700;">${prods ? prods.length : 0} Active SKUs</div><div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Est. Asset Value: $${Math.round(totalValUSD).toLocaleString()}</div>`;
+            document.getElementById("metric-orders").innerText = ords ? ords.length : 0;
+            renderDynamicSalesChart(ords || []);
+        }
+
+        function renderDynamicSalesChart(ordersData) {
+            const canvas = document.getElementById('salesChart');
+            if(!canvas || typeof Chart === 'undefined') return;
+            const counts = { 'Sun':0, 'Mon':0, 'Tue':0, 'Wed':0, 'Thu':0, 'Fri':0, 'Sat':0 };
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            ordersData.forEach(o => { if(o.created_at) counts[days[new Date(o.created_at).getDay()]] += (o.quantity || 1); });
+            
+            if(window.activeChart) window.activeChart.destroy();
+            window.activeChart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                    datasets: [{ label: 'Weekly Volume', data: Object.values(counts), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.3 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function setupAdminSearchFilters() {
+            const fc = document.getElementById("inventory-filter-container");
+            fc.innerHTML = `<div style="display:flex; gap:1rem; margin-bottom:1.5rem;"><input type="text" id="admin-search-box" class="search-input" placeholder="Filter stock..." style="flex:2;"><select id="admin-category-box" class="filter-select" style="flex:1;"><option value="All">All Categories</option><option value="Grains">Grains</option><option value="Agriculture">Agriculture</option><option value="Construction">Construction</option><option value="Electronics">Electronics</option></select></div>`;
+            const runFilter = () => {
+                const q = document.getElementById("admin-search-box").value.toLowerCase().trim();
+                const cat = document.getElementById("admin-category-box").value;
+                const filtered = localAdminInventoryCache.filter(i => (i.title.toLowerCase().includes(q) || i.description?.toLowerCase().includes(q)) && (cat === "All" || i.category === cat));
+                renderInventoryRowsHTML(filtered);
+            };
+            document.getElementById("admin-search-box").addEventListener("input", runFilter);
+            document.getElementById("admin-category-box").addEventListener("change", runFilter);
+        }
+
+        async function loadInventoryControlMatrix() {
+            const { data, error } = await window.supabase.from('products').select('*').order('created_at', { ascending: false });
+            if (!error && data) {
+                localAdminInventoryCache = data;
+                data.forEach(p => window.productCacheMap[p.id] = p);
+                document.getElementById("admin-search-box").dispatchEvent(new Event("input"));
+            }
+        }
+
+        function renderInventoryRowsHTML(skus) {
+            const tbody = document.getElementById("sku-table-body");
+            tbody.innerHTML = skus.length === 0 ? `<tr><td colspan="6" style="text-align:center;">No records match query.</td></tr>` : "";
+            
+            skus.forEach(sku => {
+                const isRwf = sku.description?.includes("[CURRENCY:RWF]");
+                const priceStr = isRwf ? `${sku.price?.toLocaleString()} RWF` : `$${sku.price?.toLocaleString()}`;
+                const img = sku.image_url ? (sku.image_url.startsWith('http') ? sku.image_url : window.supabase.storage.from('product-assets').getPublicUrl(sku.image_url).data.publicUrl) : '';
+                const imgHtml = img ? `<img src="${img}" style="width:45px; height:45px; object-fit:cover; border-radius:6px;">` : `<span style="font-size:11px; color:var(--text-muted)">No File</span>`;
+                
+                const tr = document.createElement("tr");
+                if(sku.quantity <= 3) tr.classList.add("low-stock-alert");
+                
+                tr.innerHTML = `
+                    <td style="text-align:center;">${imgHtml}</td>
+                    <td style="font-weight:600;">${escapeHTML(sku.title)}</td>
+                    <td>${sku.category}</td>
+                    <td style="font-weight:700; color:var(--accent);">${priceStr}</td>
+                    <td><span class="badge" style="background:#64748b; color:white; margin-right:8px;">${sku.status}</span><span style="font-size:12px; font-weight:600;">(${sku.quantity || 0} left)</span></td>
+                    <td style="text-align:center;">
+                        <button class="btn btn-primary" style="padding:4px 10px; font-size:12px;" onclick="safeInitEdit('${sku.id}')">Edit</button>
+                        <button class="btn" style="background:var(--danger); color:white; padding:4px 10px; font-size:12px;" onclick="safeDelete('${sku.id}')">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        window.safeInitEdit = function(id) {
+            const sku = window.productCacheMap[id];
+            if(!sku) return;
+            const container = document.getElementById("product-form-container");
+            container.style.display = "block";
+            document.getElementById("sku-id").value = sku.id;
+            document.getElementById("sku-title").value = sku.title;
+            document.getElementById("sku-category").value = sku.category;
+            document.getElementById("sku-price").value = sku.price;
+            document.getElementById("sku-qty").value = sku.quantity || 0;
+            document.getElementById("sku-status").value = sku.status;
+            document.getElementById("sku-desc").value = sku.description ? sku.description.replace(/\[CURRENCY:\w+\]/g, "").trim() : "";
+            document.getElementById("sku-currency-type").value = sku.description?.includes("[CURRENCY:RWF]") ? "RWF" : "USD";
+            document.getElementById("sku-file").dataset.existingUrl = sku.image_url || "";
+            container.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        window.safeDelete = async function(id) {
+            if(!confirm("Proceed with purging this commodity from database?")) return;
+            await window.supabase.from('products').delete().eq('id', id);
+            showToast("Commodity purged.");
+            loadInventoryControlMatrix();
+            loadAnalyticsDashboard();
+        };
+
+        window.openNewProductForm = () => {
+            const container = document.getElementById("product-form-container");
+            container.style.display = container.style.display === 'none' ? 'block' : 'none';
+            if(container.style.display === 'block') document.getElementById("sku-management-form").reset();
+        };
+
+        document.getElementById("sku-management-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.innerText = "Transmitting..."; btn.disabled = true;
+
+            try {
+                const id = document.getElementById("sku-id").value;
+                const fileInput = document.getElementById("sku-file");
+                let assetUrl = fileInput.dataset.existingUrl || "";
+                
+                if(fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    const fp = `images/${Date.now()}-${file.name.replace(/[^a-z0-9.]/gi, '_')}`;
+                    const { error: upErr } = await window.supabase.storage.from('product-assets').upload(fp, file);
+                    if(upErr) throw upErr;
+                    assetUrl = window.supabase.storage.from('product-assets').getPublicUrl(fp).data.publicUrl;
+                }
+
+                const payload = {
+                    title: document.getElementById("sku-title").value.trim(),
+                    price: parseFloat(document.getElementById("sku-price").value),
+                    category: document.getElementById("sku-category").value,
+                    quantity: parseInt(document.getElementById("sku-qty").value) || 0,
+                    status: document.getElementById("sku-status").value,
+                    description: `${document.getElementById("sku-desc").value.trim()} [CURRENCY:${document.getElementById("sku-currency-type").value}]`,
+                    image_url: assetUrl || null
+                };
+
+                if (id) {
+                     await window.supabase.from('products').update(payload).eq('id', id);
+                } else {
+                     await window.supabase.from('products').insert([payload]);
+                }
+                
+                showToast(id ? "Record Updated" : "Entry Registered");
+                openNewProductForm();
+                loadInventoryControlMatrix();
+            } catch(err) {
+                alert("Database Fault: " + err.message);
+            } finally {
+                btn.innerText = "Save to Database"; btn.disabled = false;
+            }
+        });
+
+        async function loadOrdersQueue() {
+            const { data, error } = await window.supabase.from('orders').select('*').order('created_at', { ascending: false });
+            if(!error && data) { rawOrdersCache = data; renderOrdersTable(); }
+        }
+
+        function renderOrdersTable() {
+            const tbody = document.getElementById("admin-orders-list");
+            if (!tbody) return; 
+            const term = document.getElementById("order-search").value.toLowerCase().trim();
+            const statusFilter = document.getElementById("order-status-filter").value;
+            
+            const filtered = rawOrdersCache.filter(o => {
+                return (o.customer_name?.toLowerCase().includes(term) || o.id.toLowerCase().includes(term)) && (statusFilter === "All" || o.status === statusFilter);
+            });
+
+            tbody.innerHTML = filtered.length === 0 ? `<tr><td colspan="7" style="text-align:center; padding:2rem;">No records found.</td></tr>` : "";
+            filtered.forEach(o => {
+                const date = o.created_at ? new Date(o.created_at).toLocaleDateString() : 'N/A';
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td style="font-family:monospace; font-size:12px;">#${o.id.substring(0,8).toUpperCase()}</td>
+                    <td>${date}</td>
+                    <td><strong>${escapeHTML(o.customer_name)}</strong><br><small>${o.customer_phone || o.phone_number || 'No contact'}</small></td>
+                    <td><strong>${escapeHTML(o.product_title)}</strong><br><small>Qty: ${o.quantity}</small></td>
+                    <td>${escapeHTML(o.location || 'N/A')}</td>
+                    <td>
+                        <select onchange="updateStatus('${o.id}', this.value)" style="padding:4px;">
+                            <option ${o.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                            <option ${o.status === 'Processing' ? 'selected' : ''}>Processing</option>
+                            <option ${o.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+                        </select>
+                    </td>
+                    <td><button onclick="archivePO('${o.id}')" style="padding:4px 8px;">Archive</button></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        window.updateStatus = async (id, status) => {
+            await window.supabase.from('orders').update({ status }).eq('id', id);
+            showToast("Order status updated to " + status);
+        };
+
+        window.archivePO = async (id) => {
+            if(!confirm("Archive this record?")) return;
+            await window.supabase.from('orders').delete().eq('id', id);
+            loadOrdersQueue();
+        };
+    </script>
+</body>
+</html>

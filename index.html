@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mwamini Trading Portal</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <header>
+        <div class="brand-title">MWAMINI TRADING</div>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <button id="theme-toggle" class="btn" style="width:auto; padding:0.5rem 1rem; background: var(--border-color); color: var(--text-main);">Theme</button>
+            <button onclick="openVerificationModal()" class="btn btn-primary" style="font-size:14px; padding:0.5rem 1rem;">Admin Login</button>
+        </div>
+    </header>
+
+    <section style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: white; padding: 4rem 5%; text-align: center; border-bottom: 4px solid #10b981;">
+        <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">Premium Wholesale & Retail Commodities</h1>
+        <p style="font-size: 1.1rem; opacity: 0.9;">Real-time stock validation. Direct dispatch logistics.</p>
+    </section>
+
+    <div class="search-filter-bar">
+        <input type="text" id="search-input" class="search-input" style="flex:2;" placeholder="Search across global inventory (e.g. Rice, Fertilizer)...">
+        <select id="category-filter" class="filter-select" style="flex:1;">
+            <option value="All">All Categories</option>
+            <option value="Grains">Grains</option>
+            <option value="Agriculture">Agriculture</option>
+            <option value="Construction">Construction</option>
+            <option value="Electronics">Electronics</option>
+        </select>
+        <select id="currency-select" class="filter-select" style="max-width: 150px;">
+            <option value="USD">🇺🇸 USD ($)</option>
+            <option value="RWF">🇷🇼 RWF (Fr)</option>
+            <option value="RUB">🇷🇺 RUB (₽)</option>
+        </select>
+    </div>
+
+    <main class="products-grid" id="products-container"></main>
+
+    <div class="modal" id="verification-modal">
+        <div class="modal-content glass-panel" style="text-align: center; max-width: 400px;">
+            <button type="button" class="close-modal-btn" onclick="closeVerificationModal()">✕</button>
+            <h2 style="margin-bottom: 1rem; color: var(--text-main);">Admin Verification</h2>
+            <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 1.5rem;">Enter secure verification pin to access terminal.</p>
+            <input type="password" id="verification-pin" class="search-input" style="width: 100%; text-align: center; font-size: 1.2rem; letter-spacing: 2px; margin-bottom: 1rem;" placeholder="Enter Access Code">
+            <p id="verification-error" style="color: var(--danger); font-size: 13px; height: 18px; margin-bottom: 1rem;"></p>
+            <button onclick="verifyAdminAccess()" class="btn btn-primary" style="width: 100%;">Verify Access</button>
+        </div>
+    </div>
+
+    <div class="modal" id="order-modal">
+        <div class="modal-content">
+            <button type="button" class="close-modal-btn" onclick="closeOrderModal()">✕</button>
+            <h3 style="margin-bottom: 1.5rem; padding-right: 2rem;" id="modal-product-title">Place Order Submission</h3>
+            <form id="order-submission-form">
+                <input type="hidden" id="form-product-id">
+                <input type="hidden" id="form-product-title-val">
+                
+                <label style="display:block; margin: 0.5rem 0 0.25rem;">Full Name</label>
+                <input type="text" id="cust-name" class="search-input" style="width:100%; margin-bottom:1rem;" required>
+                
+                <label style="display:block; margin: 0.5rem 0 0.25rem;">Phone Number (WhatsApp Active)</label>
+                <input type="tel" id="cust-phone" class="search-input" style="width:100%; margin-bottom:1rem;" required>
+                
+                <label style="display:block; margin: 0.5rem 0 0.25rem;">Quantity Requested</label>
+                <input type="number" id="cust-qty" value="1" min="1" class="search-input" style="width:100%; margin-bottom:1rem;" required>
+                
+                <label style="display:block; margin: 0.5rem 0 0.25rem;">Delivery Destination / Hub</label>
+                <input type="text" id="cust-location" class="search-input" style="width:100%; margin-bottom:1rem;" required>
+                
+                <label style="display:block; margin: 0.5rem 0 0.25rem;">Special Notes or Freight Requests</label>
+                <textarea id="cust-notes" class="search-input" style="width:100%; height:80px; margin-bottom:1.5rem;"></textarea>
+                
+                <button type="submit" id="submit-order-btn" class="btn btn-primary" style="width: 100%;">Authorize & Transmit Order</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="supabase-config.js"></script>
+    <script>
+        let localProductsCache = [];
+        const exchangeRates = { USD: 1, RWF: 1290, RUB: 91.5 };
+
+        document.addEventListener("DOMContentLoaded", () => {
+            initializePublicCatalog();
+            setupSearchFilters();
+            initializeOrderFulfillmentEngine();
+            
+            const root = document.documentElement;
+            document.getElementById('theme-toggle').addEventListener('click', () => {
+                root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+            });
+        });
+
+        function openVerificationModal() { document.getElementById('verification-modal').classList.add('active'); }
+        function closeVerificationModal() { 
+            document.getElementById('verification-modal').classList.remove('active'); 
+            document.getElementById('verification-pin').value = '';
+            document.getElementById('verification-error').innerText = '';
+        }
+
+        function verifyAdminAccess() {
+            const input = document.getElementById('verification-pin');
+            const errorText = document.getElementById('verification-error');
+            if(input.value === 'Password@4321') {
+                window.location.href = 'login.html';
+            } else {
+                input.classList.add('shake-anim');
+                errorText.innerText = "Invalid security pin. Access denied.";
+                setTimeout(() => input.classList.remove('shake-anim'), 500);
+            }
+        }
+
+        async function initializePublicCatalog() {
+            const container = document.getElementById("products-container");
+            if (!window.supabase) return;
+            const { data, error } = await window.supabase.from('products').select('*').order('created_at', { ascending: false });
+            if (error) { 
+                container.innerHTML = `<p style="grid-column: 1/-1; text-align:center; color: var(--danger);">Sync Error: ${error.message}</p>`; 
+                return; 
+            }
+            localProductsCache = data || [];
+            renderCatalogGrid(localProductsCache);
+            initializeRealtimeCatalogUpdates();
+        }
+
+        function renderCatalogGrid(productsList) {
+            const container = document.getElementById("products-container");
+            const targetCurrency = document.getElementById("currency-select").value;
+            container.innerHTML = "";
+            
+            productsList.forEach(item => {
+                const sourceCurrency = item.description?.includes("[CURRENCY:RWF]") ? "RWF" : (item.description?.includes("[CURRENCY:RUB]") ? "RUB" : "USD");
+                const convertedPrice = (item.price / exchangeRates[sourceCurrency]) * exchangeRates[targetCurrency];
+                const currencySymbol = targetCurrency === "USD" ? "$" : (targetCurrency === "RWF" ? "RWF " : "₽");
+                const cleanDesc = item.description ? item.description.replace(/\[CURRENCY:\w+\]/g, "").trim() : "";
+                const isLowStock = item.quantity <= 3;
+                const finalMediaUrl = item.image_url ? (item.image_url.startsWith('http') ? item.image_url : window.supabase.storage.from('product-assets').getPublicUrl(item.image_url).data.publicUrl) : "https://via.placeholder.com/400x300?text=No+Asset";
+
+                const cardNode = document.createElement("div");
+                cardNode.className = `product-card ${isLowStock ? 'low-stock-alert' : ''}`;
+                cardNode.innerHTML = `
+                    <div style="position: relative; height: 200px; background: #f1f5f9;">
+                        <img src="${finalMediaUrl}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/400x300?text=Asset+Link+Error'">
+                        <span style="position: absolute; top: 0.75rem; right: 0.75rem; background: ${isLowStock ? 'var(--danger)' : 'var(--accent)'}; color: white; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;">
+                            ${item.status} (${item.quantity} units)
+                        </span>
+                    </div>
+                    <div style="padding: 1.25rem; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <span style="font-size: 11px; text-transform: uppercase; font-weight:700; color: var(--accent);">${item.category}</span>
+                            <h4 style="font-size: 18px; margin: 0.25rem 0 0.5rem; color: var(--text-main); font-weight: 600;">${item.title}</h4>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4;">${cleanDesc}</p>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                            <span style="font-size: 20px; font-weight: 700; color: var(--success);">${currencySymbol}${Math.round(convertedPrice).toLocaleString()}</span>
+                            <button class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 13px;" onclick="openOrderModal('${item.id}', '${item.title.replace(/'/g, "\\'")}')">Order</button>
+                            // ... inside initializeOrderFulfillmentEngine()
+const payload = {
+    product_id: productId,
+    product_title: document.getElementById("form-product-title-val").value,
+    customer_name: document.getElementById("cust-name").value.trim(),
+    customer_phone: document.getElementById("cust-phone").value.trim(),
+    quantity: requestedQty,
+    delivery_location: document.getElementById("cust-location").value.trim(), // Changed from 'location'
+    notes: document.getElementById("cust-notes").value.trim(),
+    status: 'Pending'
+};
+// ...
+                        </div>
+                    </div>`;
+                container.appendChild(cardNode);
+            });
+        }
+
+        window.openOrderModal = (id, title) => {
+            document.getElementById('form-product-id').value = id;
+            document.getElementById('form-product-title-val').value = title;
+            document.getElementById('modal-product-title').innerText = `Request Allocation: ${title}`;
+            document.getElementById('order-modal').classList.add('active');
+        };
+        window.closeOrderModal = () => document.getElementById('order-modal').classList.remove('active');
+
+        function initializeOrderFulfillmentEngine() {
+            document.getElementById("order-submission-form").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById("submit-order-btn");
+                btn.disabled = true;
+                
+                const productId = document.getElementById("form-product-id").value;
+                const requestedQty = parseInt(document.getElementById("cust-qty").value, 10);
+                const targetedProduct = localProductsCache.find(p => p.id === productId);
+
+                if (!targetedProduct || targetedProduct.quantity < requestedQty) {
+                    alert(`Fulfillment Error: Insufficient stock. Only ${targetedProduct?.quantity || 0} units remain.`);
+                    btn.disabled = false;
+                    return;
+                }
+
+                const payload = {
+                    product_id: productId,
+                    product_title: document.getElementById("form-product-title-val").value,
+                    customer_name: document.getElementById("cust-name").value.trim(),
+                    customer_phone: document.getElementById("cust-phone").value.trim(),
+                    quantity: requestedQty,
+                    location: document.getElementById("cust-location").value.trim(),
+                    notes: document.getElementById("cust-notes").value.trim(),
+                    status: 'Pending'
+                };
+
+                const { error } = await window.supabase.from('orders').insert([payload]);
+                if (error) { alert(`Routing failed: ${error.message}`); btn.disabled = false; return; }
+
+                const updatedQty = targetedProduct.quantity - requestedQty;
+                await window.supabase.from('products').update({ 
+                    quantity: updatedQty, 
+                    status: updatedQty === 0 ? 'Out of stock' : (updatedQty <= 3 ? 'Limited stock' : targetedProduct.status)
+                }).eq('id', productId);
+
+                alert("Transaction Processed Successfully!");
+                closeOrderModal();
+                e.target.reset();
+                btn.disabled = false;
+            });
+        }
+
+        function setupSearchFilters() {
+            const trigger = () => {
+                const searchVal = document.getElementById("search-input").value.toLowerCase().trim();
+                const categoryVal = document.getElementById("category-filter").value;
+                const filtered = localProductsCache.filter(p => {
+                    const matchQuery = p.title.toLowerCase().includes(searchVal) || p.description?.toLowerCase().includes(searchVal);
+                    return (categoryVal === "All" || p.category === categoryVal) && matchQuery;
+                });
+                renderCatalogGrid(filtered);
+            };
+            document.getElementById("search-input").addEventListener("input", trigger);
+            document.getElementById("category-filter").addEventListener("change", trigger);
+            document.getElementById("currency-select").addEventListener("change", () => renderCatalogGrid(localProductsCache));
+        }
+
+        function initializeRealtimeCatalogUpdates() {
+            window.supabase.channel('public-products-channel')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
+                    const { data } = await window.supabase.from('products').select('*').order('created_at', { ascending: false });
+                    if (data) {
+                        localProductsCache = data;
+                        document.getElementById("search-input").dispatchEvent(new Event("input"));
+                    }
+                }).subscribe();
+        }
+    </script>
+</body>
+</html>

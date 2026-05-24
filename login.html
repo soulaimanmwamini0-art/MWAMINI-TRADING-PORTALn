@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Admin Terminal | Mwamini</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .login-container { max-width: 400px; margin: 10vh auto; padding: 2rem; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .input-group { position: relative; margin-bottom: 1.5rem; }
+        .password-toggle { position: absolute; right: 10px; top: 38px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--accent); user-select: none; }
+        button:disabled { opacity: 0.7; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <div class="login-container">
+        <h2 style="margin-bottom: 1.5rem; text-align: center;">System Authentication</h2>
+        <form id="login-form">
+            <div class="input-group">
+                <label>Administrative Email</label>
+                <input type="email" id="admin-email" class="search-input" style="width: 100%;" required placeholder="admin@mwamini.com">
+            </div>
+            
+            <div class="input-group">
+                <label>Security Key</label>
+                <input type="password" id="admin-password" class="search-input" style="width: 100%;" required placeholder="••••••••">
+                <span class="password-toggle" id="toggle-text" onclick="togglePassword()">Show</span>
+            </div>
+            
+            <button type="submit" id="login-btn" class="btn btn-primary" style="width: 100%;">Authorize Access</button>
+            <p id="error-msg" style="margin-top: 1rem; text-align: center; font-size: 14px; color: var(--danger);"></p>
+        </form>
+    </div>
+
+    <script src="supabase-config.js"></script>
+    <script>
+        const loginForm = document.getElementById("login-form");
+        const btn = document.getElementById("login-btn");
+        const errorMsg = document.getElementById("error-msg");
+
+        // CORRECTED: Targets the input ID 'admin-password'
+        function togglePassword() {
+            const passInput = document.getElementById("admin-password");
+            const toggleText = document.getElementById("toggle-text");
+            
+            if (passInput.type === "password") {
+                passInput.type = "text";
+                toggleText.innerText = "Hide";
+            } else {
+                passInput.type = "password";
+                toggleText.innerText = "Show";
+            }
+        }
+
+        loginForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById("admin-email").value.trim();
+            const password = document.getElementById("admin-password").value;
+
+            btn.disabled = true;
+            btn.innerText = "Verifying...";
+            errorMsg.innerText = "";
+
+            try {
+                const { error } = await window.supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+                if (error) throw error;
+                
+                window.location.replace("admin.html");
+            } catch (err) {
+                errorMsg.innerText = "Access Denied: " + err.message;
+                btn.disabled = false;
+                btn.innerText = "Authorize Access";
+            }
+        });
+    </script>
+</body>
+</html>
