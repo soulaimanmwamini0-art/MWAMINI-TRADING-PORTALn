@@ -112,17 +112,24 @@
 
     <script src="supabase-config.js"></script>
     <script>
+        // --- Core Helpers ---
+        function renderStars(ratingNumber) {
+            const num = parseInt(ratingNumber, 10) || 0;
+            return '⭐'.repeat(num); 
+        }
+
+        function escapeHTML(str) {
+            const p = document.createElement('p');
+            p.textContent = str || "";
+            return p.innerHTML;
+        }
+
+        // --- Global Variables ---
         let localAdminInventoryCache = [];
         let rawOrdersCache = [];
         const conversionAnchorRates = { USD: 1, RWF: 1290 };
         window.productCacheMap = {};
         let debounceTimer;
-
-        // HELPER: Converts a number (1-5) into a visual star string
-        function renderStars(ratingNumber) {
-            const num = parseInt(ratingNumber, 10) || 0;
-            return '⭐'.repeat(num); 
-        }
 
         document.addEventListener("DOMContentLoaded", async () => {
             if(!window.supabase) { console.error("Supabase not found"); return; }
@@ -156,6 +163,7 @@
             document.getElementById('order-status-filter').addEventListener('change', renderOrdersTable);
         }
 
+        // --- Comments & Support Logic ---
         async function loadCustomerComments() {
             const [{ data: reviews }, { data: inquiries }] = await Promise.all([
                 window.supabase.from('reviews').select('*'),
@@ -176,26 +184,29 @@
             
             inquiries?.forEach(i => {
                 const row = document.createElement('tr');
-                row.innerHTML = `<td>Support</td><td>${escapeHTML(i.name)}</td><td>[${i.category}] ${escapeHTML(i.subject)}: ${escapeHTML(i.message)}</td><td><select onchange="updateTicketStatus('${i.id}', this.value)"><option ${i.status==='Pending'?'selected':''}>Pending</option><option ${i.status==='Processing'?'selected':''}>Processing</option><option ${i.status==='Resolved'?'selected':''}>Resolved</option></select></td>`;
+                row.innerHTML = `<td>Support</td><td>${escapeHTML(i.name)}</td><td>[${i.category}] ${escapeHTML(i.subject)}: ${escapeHTML(i.message)}</td>
+                <td>
+                    <select onchange="updateTicketStatus('${i.id}', this.value)">
+                        <option ${i.status==='Pending'?'selected':''}>Pending</option>
+                        <option ${i.status==='Processing'?'selected':''}>Processing</option>
+                        <option ${i.status==='Resolved'?'selected':''}>Resolved</option>
+                    </select>
+                    <button style="margin-left:5px; background:var(--danger); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="deleteEntry('inquiries','${i.id}')">Delete</button>
+                </td>`;
                 tbody.appendChild(row);
             });
         }
 
-        function escapeHTML(str) {
-            const p = document.createElement('p');
-            p.textContent = str || "";
-            return p.innerHTML;
-        }
-
         window.updateTicketStatus = async (id, status) => {
             await window.supabase.from('inquiries').update({ status }).eq('id', id);
-            showToast("Ticket status updated");
+            showToast("Ticket status updated to " + status);
         };
 
         window.deleteEntry = async (table, id) => {
-            if(!confirm("Are you sure?")) return;
+            if(!confirm("Are you sure you want to permanently remove this?")) return;
             await window.supabase.from(table).delete().eq('id', id);
             loadCustomerComments();
+            showToast("Entry deleted successfully.");
         };
 
         function showToast(msg) {
@@ -204,6 +215,7 @@
             setTimeout(() => toast.classList.remove("show"), 3000);
         }
 
+        // --- Navigation Logic ---
         function setupNavigationListeners() {
             const navButtons = document.querySelectorAll('.sidebar .btn:not(#logout-btn)');
             navButtons.forEach((btn, index) => {
@@ -218,6 +230,7 @@
             });
         }
 
+        // --- Dashboard Analytics Logic ---
         async function loadAnalyticsDashboard() {
             const { data: prods } = await window.supabase.from('products').select('*');
             const { data: ords } = await window.supabase.from('orders').select('*');
@@ -251,6 +264,7 @@
             });
         }
 
+        // --- Inventory Logic ---
         function setupAdminSearchFilters() {
             const fc = document.getElementById("inventory-filter-container");
             fc.innerHTML = `<div style="display:flex; gap:1rem; margin-bottom:1.5rem;"><input type="text" id="admin-search-box" class="search-input" placeholder="Filter stock..." style="flex:2;"><select id="admin-category-box" class="filter-select" style="flex:1;"><option value="All">All Categories</option><option value="Grains">Grains</option><option value="Agriculture">Agriculture</option><option value="Construction">Construction</option><option value="Electronics">Electronics</option></select></div>`;
@@ -376,6 +390,7 @@
             }
         });
 
+        // --- Orders Logic ---
         async function loadOrdersQueue() {
             const { data, error } = await window.supabase.from('orders').select('*').order('created_at', { ascending: false });
             if(!error && data) { rawOrdersCache = data; renderOrdersTable(); }
