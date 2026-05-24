@@ -6,11 +6,32 @@
     <title>Mwamini Trading Portal</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* Updated Grid to ensure cards are at least 350px wide */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 2rem;
+            padding: 2rem 5%;
+        }
+        .product-card {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--bg-surface);
+            transition: transform 0.2s;
+        }
+    </style>
 </head>
 <body>
 
     <header>
-        <div class="brand-title">MWAMINI TRADING</div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <img src="Company logo.jpg" alt="Mwamini Logo" style="height: 40px; border-radius: 4px;">
+            <div class="brand-title">MWAMINI TRADING</div>
+        </div>
         <div style="display: flex; gap: 1rem; align-items: center;">
             <button id="theme-toggle" class="btn" style="width:auto; padding:0.5rem 1rem; background: var(--border-color); color: var(--text-main);">Theme</button>
             <button onclick="openVerificationModal()" class="btn btn-primary" style="font-size:14px; padding:0.5rem 1rem;">Admin Login</button>
@@ -18,12 +39,13 @@
     </header>
 
     <section style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: white; padding: 4rem 5%; text-align: center; border-bottom: 4px solid #10b981;">
-        <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">Premium Wholesale & Retail Commodities</h1>
-        <p style="font-size: 1.1rem; opacity: 0.9;">Real-time stock validation. Direct dispatch logistics.</p>
+        <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">Welcome to Mwamini Trading</h1>
+        <p style="font-size: 1.2rem; opacity: 0.9; margin-bottom: 0.5rem;">We are delighted to serve you with the finest selection of commodities.</p>
+        <p style="font-size: 1.1rem; opacity: 0.9;">Explore our delicious, high-quality inventory, ready for direct dispatch to your doorstep.</p>
     </section>
 
     <div class="search-filter-bar">
-        <input type="text" id="search-input" class="search-input" style="flex:2;" placeholder="Search across global inventory (e.g. Rice, Fertilizer)...">
+        <input type="text" id="search-input" class="search-input" style="flex:2;" placeholder="Search our delicious selection (e.g. Rice, Fertilizer)...">
         <select id="category-filter" class="filter-select" style="flex:1;">
             <option value="All">All Categories</option>
             <option value="Grains">Grains</option>
@@ -94,7 +116,6 @@
         <div class="modal-content glass-panel" style="text-align: center; max-width: 400px;">
             <button type="button" class="close-modal-btn" onclick="closeVerificationModal()">✕</button>
             <h2 style="margin-bottom: 1rem; color: var(--text-main);">Admin Verification</h2>
-            <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 1.5rem;">Enter secure verification pin to access terminal.</p>
             <input type="password" id="verification-pin" class="search-input" style="width: 100%; text-align: center; font-size: 1.2rem; letter-spacing: 2px; margin-bottom: 1rem;" placeholder="Enter Access Code">
             <p id="verification-error" style="color: var(--danger); font-size: 13px; height: 18px; margin-bottom: 1rem;"></p>
             <button onclick="verifyAdminAccess()" class="btn btn-primary" style="width: 100%;">Verify Access</button>
@@ -138,7 +159,7 @@
             initializePublicCatalog();
             setupSearchFilters();
             initializeOrderFulfillmentEngine();
-            initializeFeedbackEngine(); // NEW INITIALIZATION
+            initializeFeedbackEngine();
             
             const root = document.documentElement;
             document.getElementById('theme-toggle').addEventListener('click', () => {
@@ -146,14 +167,11 @@
             });
         });
 
-        // --- NEW SUPPORT ENGINE LOGIC ---
         function initializeFeedbackEngine() {
-            // Handle Review Submissions
             document.getElementById("review-form").addEventListener("submit", async (e) => {
                 e.preventDefault();
                 const btn = e.target.querySelector('button[type="submit"]');
                 btn.disabled = true; btn.innerText = "Transmitting...";
-                
                 try {
                     const payload = {
                         name: document.getElementById("review-name").value.trim(),
@@ -162,25 +180,18 @@
                     };
                     const { error } = await window.supabase.from('reviews').insert([payload]);
                     if (error) throw error;
-                    
                     alert("Review transmitted successfully. Your insights are valued.");
                     e.target.reset();
-                } catch (err) {
-                    alert(`Routing failed: ${err.message}`);
-                } finally {
-                    btn.disabled = false; btn.innerText = "Submit Platform Review";
-                }
+                } catch (err) { alert(`Routing failed: ${err.message}`); } finally { btn.disabled = false; btn.innerText = "Submit Platform Review"; }
             });
 
-            // Handle Inquiry Submissions
             document.getElementById("inquiry-form").addEventListener("submit", async (e) => {
                 e.preventDefault();
                 const btn = e.target.querySelector('button[type="submit"]');
                 btn.disabled = true; btn.innerText = "Transmitting...";
-                
                 try {
                     const payload = {
-                        name: "Platform Guest User", // Auto-assigned for anonymous tickets
+                        name: "Platform Guest User",
                         category: "Support Ticket",
                         subject: document.getElementById("inquiry-subject").value.trim(),
                         message: document.getElementById("inquiry-message").value.trim(),
@@ -188,17 +199,11 @@
                     };
                     const { error } = await window.supabase.from('inquiries').insert([payload]);
                     if (error) throw error;
-                    
                     alert("Ticket securely routed to the helpdesk. We will contact you shortly.");
                     e.target.reset();
-                } catch (err) {
-                    alert(`Routing failed: ${err.message}`);
-                } finally {
-                    btn.disabled = false; btn.innerText = "Transmit Ticket to Helpdesk";
-                }
+                } catch (err) { alert(`Routing failed: ${err.message}`); } finally { btn.disabled = false; btn.innerText = "Transmit Ticket to Helpdesk"; }
             });
         }
-        // ---------------------------------
 
         function openVerificationModal() { document.getElementById('verification-modal').classList.add('active'); }
         function closeVerificationModal() { 
@@ -282,17 +287,14 @@
                 e.preventDefault();
                 const btn = document.getElementById("submit-order-btn");
                 btn.disabled = true;
-                
                 const productId = document.getElementById("form-product-id").value;
                 const requestedQty = parseInt(document.getElementById("cust-qty").value, 10);
                 const targetedProduct = localProductsCache.find(p => p.id === productId);
-
                 if (!targetedProduct || targetedProduct.quantity < requestedQty) {
                     alert(`Fulfillment Error: Insufficient stock. Only ${targetedProduct?.quantity || 0} units remain.`);
                     btn.disabled = false;
                     return;
                 }
-
                 const payload = {
                     product_id: productId,
                     product_title: document.getElementById("form-product-title-val").value,
@@ -303,16 +305,13 @@
                     notes: document.getElementById("cust-notes").value.trim(),
                     status: 'Pending'
                 };
-
                 const { error } = await window.supabase.from('orders').insert([payload]);
                 if (error) { alert(`Routing failed: ${error.message}`); btn.disabled = false; return; }
-
                 const updatedQty = targetedProduct.quantity - requestedQty;
                 await window.supabase.from('products').update({ 
                     quantity: updatedQty, 
                     status: updatedQty === 0 ? 'Out of stock' : (updatedQty <= 3 ? 'Limited stock' : targetedProduct.status)
                 }).eq('id', productId);
-
                 alert("Transaction Processed Successfully!");
                 closeOrderModal();
                 e.target.reset();
