@@ -115,7 +115,7 @@
         // --- Core Helpers ---
         function renderStars(ratingNumber) {
             const num = parseInt(ratingNumber, 10) || 0;
-            return '⭐'.repeat(num); 
+            return '⭐'.repeat(Math.max(0, Math.min(num, 5))); 
         }
 
         function escapeHTML(str) {
@@ -135,12 +135,16 @@
             if(!window.supabase) { console.error("Supabase not found"); return; }
             
             const { data: { session } } = await window.supabase.auth.getSession();
-            if(!session) window.location.replace("login.html");
-            else initAdminApp();
+            if(!session) {
+                window.location.replace("login.html");
+                return;
+            }
+            initAdminApp();
 
             document.getElementById('theme-toggle').addEventListener('click', () => {
                 const root = document.documentElement;
-                root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+                const newTheme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                root.setAttribute('data-theme', newTheme);
             });
             document.getElementById('logout-btn').addEventListener('click', async () => {
                 await window.supabase.auth.signOut();
@@ -165,10 +169,12 @@
 
         // --- Comments & Support Logic ---
         async function loadCustomerComments() {
-            const [{ data: reviews }, { data: inquiries }] = await Promise.all([
+            const [{ data: reviews, error: rErr }, { data: inquiries, error: iErr }] = await Promise.all([
                 window.supabase.from('reviews').select('*'),
                 window.supabase.from('inquiries').select('*')
             ]);
+            
+            if (rErr || iErr) { console.error("Data fetch error", rErr || iErr); return; }
             
             document.getElementById('stat-reviews').innerText = reviews?.length || 0;
             document.getElementById('stat-tickets').innerText = inquiries?.filter(i => i.status !== 'Resolved').length || 0;
@@ -198,8 +204,8 @@
         }
 
         window.updateTicketStatus = async (id, status) => {
-            await window.supabase.from('inquiries').update({ status }).eq('id', id);
-            showToast("Ticket status updated to " + status);
+            const { error } = await window.supabase.from('inquiries').update({ status }).eq('id', id);
+            if (!error) showToast("Ticket status updated to " + status);
         };
 
         window.deleteEntry = async (table, id) => {
@@ -211,7 +217,8 @@
 
         function showToast(msg) {
             const toast = document.getElementById("toast");
-            toast.innerText = msg; toast.classList.add("show");
+            toast.innerText = msg; 
+            toast.classList.add("show");
             setTimeout(() => toast.classList.remove("show"), 3000);
         }
 
@@ -225,7 +232,8 @@
                     e.target.classList.add('active-tab');
                     
                     const views = ['analytics-view', 'inventory-view', 'orders-view', 'comments-view'];
-                    document.getElementById(views[index]).classList.add('active-panel');
+                    const targetView = document.getElementById(views[index]);
+                    if (targetView) targetView.classList.add('active-panel');
                 });
             });
         }
@@ -234,10 +242,11 @@
         async function loadAnalyticsDashboard() {
             const { data: prods } = await window.supabase.from('products').select('*');
             const { data: ords } = await window.supabase.from('orders').select('*');
+            
             let totalValUSD = 0;
             if(prods) {
                 prods.forEach(item => {
-                    const priceUSD = item.description?.includes("[CURRENCY:RWF]") ? item.price / conversionAnchorRates.RWF : item.price;
+                    const priceUSD = item.description?.includes("[CURRENCY:RWF]") ? (item.price || 0) / conversionAnchorRates.RWF : (item.price || 0);
                     totalValUSD += (priceUSD * (item.quantity || 0));
                 });
             }
@@ -249,6 +258,7 @@
         function renderDynamicSalesChart(ordersData) {
             const canvas = document.getElementById('salesChart');
             if(!canvas || typeof Chart === 'undefined') return;
+            
             const counts = { 'Sun':0, 'Mon':0, 'Tue':0, 'Wed':0, 'Thu':0, 'Fri':0, 'Sat':0 };
             const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             ordersData.forEach(o => { if(o.created_at) counts[days[new Date(o.created_at).getDay()]] += (o.quantity || 1); });
@@ -268,6 +278,7 @@
         function setupAdminSearchFilters() {
             const fc = document.getElementById("inventory-filter-container");
             fc.innerHTML = `<div style="display:flex; gap:1rem; margin-bottom:1.5rem;"><input type="text" id="admin-search-box" class="search-input" placeholder="Filter stock..." style="flex:2;"><select id="admin-category-box" class="filter-select" style="flex:1;"><option value="All">All Categories</option><option value="Grains">Grains</option><option value="Agriculture">Agriculture</option><option value="Construction">Construction</option><option value="Electronics">Electronics</option></select></div>`;
+            
             const runFilter = () => {
                 const q = document.getElementById("admin-search-box").value.toLowerCase().trim();
                 const cat = document.getElementById("admin-category-box").value;
@@ -282,6 +293,7 @@
             const { data, error } = await window.supabase.from('products').select('*').order('created_at', { ascending: false });
             if (!error && data) {
                 localAdminInventoryCache = data;
+                window.productCacheMap = {};
                 data.forEach(p => window.productCacheMap[p.id] = p);
                 document.getElementById("admin-search-box").dispatchEvent(new Event("input"));
             }
@@ -291,14 +303,15 @@
             const tbody = document.getElementById("sku-table-body");
             tbody.innerHTML = skus.length === 0 ? `<tr><td colspan="6" style="text-align:center;">No records match query.</td></tr>` : "";
             
+            const fragment = document.createDocumentFragment();
             skus.forEach(sku => {
                 const isRwf = sku.description?.includes("[CURRENCY:RWF]");
-                const priceStr = isRwf ? `${sku.price?.toLocaleString()} RWF` : `$${sku.price?.toLocaleString()}`;
+                const priceStr = isRwf ? `${(sku.price || 0).toLocaleString()} RWF` : `$${(sku.price || 0).toLocaleString()}`;
                 const img = sku.image_url ? (sku.image_url.startsWith('http') ? sku.image_url : window.supabase.storage.from('product-assets').getPublicUrl(sku.image_url).data.publicUrl) : '';
                 const imgHtml = img ? `<img src="${img}" style="width:45px; height:45px; object-fit:cover; border-radius:6px;">` : `<span style="font-size:11px; color:var(--text-muted)">No File</span>`;
                 
                 const tr = document.createElement("tr");
-                if(sku.quantity <= 3) tr.classList.add("low-stock-alert");
+                if(sku.quantity <= 3) tr.style.backgroundColor = "rgba(239, 68, 68, 0.05)";
                 
                 tr.innerHTML = `
                     <td style="text-align:center;">${imgHtml}</td>
@@ -311,8 +324,9 @@
                         <button class="btn" style="background:var(--danger); color:white; padding:4px 10px; font-size:12px;" onclick="safeDelete('${sku.id}')">Delete</button>
                     </td>
                 `;
-                tbody.appendChild(tr);
+                fragment.appendChild(tr);
             });
+            tbody.appendChild(fragment);
         }
 
         window.safeInitEdit = function(id) {
@@ -334,10 +348,12 @@
 
         window.safeDelete = async function(id) {
             if(!confirm("Proceed with purging this commodity from database?")) return;
-            await window.supabase.from('products').delete().eq('id', id);
-            showToast("Commodity purged.");
-            loadInventoryControlMatrix();
-            loadAnalyticsDashboard();
+            const { error } = await window.supabase.from('products').delete().eq('id', id);
+            if (!error) {
+                showToast("Commodity purged.");
+                loadInventoryControlMatrix();
+                loadAnalyticsDashboard();
+            }
         };
 
         window.openNewProductForm = () => {
@@ -374,15 +390,13 @@
                     image_url: assetUrl || null
                 };
 
-                if (id) {
-                     await window.supabase.from('products').update(payload).eq('id', id);
-                } else {
-                     await window.supabase.from('products').insert([payload]);
-                }
+                if (id) await window.supabase.from('products').update(payload).eq('id', id);
+                else await window.supabase.from('products').insert([payload]);
                 
                 showToast(id ? "Record Updated" : "Entry Registered");
                 openNewProductForm();
                 loadInventoryControlMatrix();
+                loadAnalyticsDashboard();
             } catch(err) {
                 alert("Database Fault: " + err.message);
             } finally {
@@ -403,10 +417,14 @@
             const statusFilter = document.getElementById("order-status-filter").value;
             
             const filtered = rawOrdersCache.filter(o => {
-                return (o.customer_name?.toLowerCase().includes(term) || o.id.toLowerCase().includes(term)) && (statusFilter === "All" || o.status === statusFilter);
+                const matchesSearch = (o.customer_name?.toLowerCase().includes(term) || o.id.toLowerCase().includes(term));
+                const matchesStatus = (statusFilter === "All" || o.status === statusFilter);
+                return matchesSearch && matchesStatus;
             });
 
             tbody.innerHTML = filtered.length === 0 ? `<tr><td colspan="7" style="text-align:center; padding:2rem;">No records found.</td></tr>` : "";
+            
+            const fragment = document.createDocumentFragment();
             filtered.forEach(o => {
                 const date = o.created_at ? new Date(o.created_at).toLocaleDateString() : 'N/A';
                 const row = document.createElement('tr');
@@ -425,19 +443,20 @@
                     </td>
                     <td><button onclick="archivePO('${o.id}')" style="padding:4px 8px;">Archive</button></td>
                 `;
-                tbody.appendChild(row);
+                fragment.appendChild(row);
             });
+            tbody.appendChild(fragment);
         }
 
         window.updateStatus = async (id, status) => {
-            await window.supabase.from('orders').update({ status }).eq('id', id);
-            showToast("Order status updated to " + status);
+            const { error } = await window.supabase.from('orders').update({ status }).eq('id', id);
+            if (!error) showToast("Order status updated to " + status);
         };
 
         window.archivePO = async (id) => {
             if(!confirm("Archive this record?")) return;
-            await window.supabase.from('orders').delete().eq('id', id);
-            loadOrdersQueue();
+            const { error } = await window.supabase.from('orders').delete().eq('id', id);
+            if (!error) loadOrdersQueue();
         };
     </script>
 </body>
