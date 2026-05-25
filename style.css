@@ -30,11 +30,11 @@ body { background-color: var(--bg-primary); color: var(--text-main); transition:
 
 /* Header & Navigation */
 header {
-    background: var(--glass-bg); backdrop-filter: blur(16px); border-bottom: 1px solid var(--glass-border);
+    background: blue; backdrop-filter: blur(16px); border-bottom: 1px solid var(--glass-border);
     position: sticky; top: 0; z-index: 100; padding: 1rem 5%; display: flex; justify-content: space-between; align-items: center;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
-.brand-title { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(45deg, var(--accent), var(--success)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.brand-title { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; color: white; }
 
 /* Buttons & Inputs */
 .btn { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s ease; outline: none; will-change: transform; }
