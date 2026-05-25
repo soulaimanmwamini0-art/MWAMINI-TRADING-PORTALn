@@ -23,6 +23,11 @@
             background: var(--bg-surface);
             transition: transform 0.2s;
         }
+        /* Modal Style Addition */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: var(--bg-surface); padding: 2rem; border-radius: 12px; width: 90%; max-width: 500px; position: relative; }
+        .close-modal-btn { position: absolute; top: 1rem; right: 1rem; border: none; background: none; cursor: pointer; font-size: 1.2rem; }
     </style>
 </head>
 <body>
@@ -61,6 +66,14 @@
     </div>
 
     <main class="products-grid" id="products-container" style="margin-bottom: 2rem;"></main>
+
+    <div class="modal" id="details-modal">
+        <div class="modal-content">
+            <button type="button" class="close-modal-btn" onclick="closeDetailsModal()">✕</button>
+            <h2 id="details-title" style="margin-bottom: 1rem;"></h2>
+            <p id="details-desc" style="color: var(--text-muted); line-height: 1.6;"></p>
+        </div>
+    </div>
 
     <section class="feedback-section" style="padding: 4rem 5%; background: var(--bg-surface); border-top: 1px solid var(--border-color);">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 4rem; max-width: 1200px; margin: 0 auto;">
@@ -167,6 +180,25 @@
             });
         });
 
+        // --- NEW: View Details and Like Logic ---
+        window.viewDetails = (id) => {
+            const prod = localProductsCache.find(p => p.id === id);
+            if(prod) {
+                document.getElementById('details-title').innerText = prod.title;
+                document.getElementById('details-desc').innerText = prod.description.replace(/\[CURRENCY:\w+\]/g, "");
+                document.getElementById('details-modal').classList.add('active');
+            }
+        };
+        window.closeDetailsModal = () => document.getElementById('details-modal').classList.remove('active');
+
+        async function likeProduct(title) {
+            const { error } = await window.supabase.from('inquiries').insert([{
+                name: "Guest User", category: "Product Interest", subject: "Like", 
+                message: `User liked: ${title}`, status: 'Pending'
+            }]);
+            alert(error ? "Like failed." : "Liked! Admin notified.");
+        }
+
         function initializeFeedbackEngine() {
             document.getElementById("review-form").addEventListener("submit", async (e) => {
                 e.preventDefault();
@@ -246,7 +278,6 @@
                 const sourceCurrency = item.description?.includes("[CURRENCY:RWF]") ? "RWF" : (item.description?.includes("[CURRENCY:RUB]") ? "RUB" : "USD");
                 const convertedPrice = (item.price / exchangeRates[sourceCurrency]) * exchangeRates[targetCurrency];
                 const currencySymbol = targetCurrency === "USD" ? "$" : (targetCurrency === "RWF" ? "RWF " : "₽");
-                const cleanDesc = item.description ? item.description.replace(/\[CURRENCY:\w+\]/g, "").trim() : "";
                 const isLowStock = item.quantity <= 3;
                 const finalMediaUrl = item.image_url ? (item.image_url.startsWith('http') ? item.image_url : window.supabase.storage.from('product-assets').getPublicUrl(item.image_url).data.publicUrl) : "https://via.placeholder.com/400x300?text=No+Asset";
 
@@ -255,13 +286,14 @@
                 cardNode.innerHTML = `
                     <div style="position: relative; height: 150px; background: #f1f5f9;">
                         <img src="${finalMediaUrl}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/400x300?text=Asset+Link+Error'">
-                        <span style="position: absolute; top: 0.5rem; right: 0.5rem; background: ${isLowStock ? 'var(--danger)' : 'var(--accent)'}; color: white; padding: 2px 6px; border-radius: 20px; font-size: 10px; font-weight: 600;">
-                            ${item.quantity} left
-                        </span>
                     </div>
                     <div style="padding: 0.75rem; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between;">
                         <div>
                             <h4 style="font-size: 14px; margin: 0 0 0.25rem 0; color: var(--text-main); font-weight: 600;">${item.title}</h4>
+                        </div>
+                        <div style="margin: 0.5rem 0;">
+                            <button class="btn" style="font-size:10px; margin-right:4px;" onclick="viewDetails('${item.id}')">Details</button>
+                            <button class="btn" style="font-size:10px; background:var(--danger); color:white;" onclick="likeProduct('${item.title.replace(/'/g, "\\'")}')">❤️</button>
                         </div>
                         <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.5rem;">
                             <span style="font-size: 14px; font-weight: 700; color: var(--success);">${currencySymbol}${Math.round(convertedPrice).toLocaleString()}</span>
